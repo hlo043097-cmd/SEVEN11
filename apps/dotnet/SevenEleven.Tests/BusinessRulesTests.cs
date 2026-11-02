@@ -130,6 +130,66 @@ public class BusinessRulesTests
         Assert.Equal(50_000, r.EligibleSpend);
     }
 
+    // ---------------------------------------------------------------- tháng sinh nhật
+
+    // Noon là tháng 10, nên sinh nhật tháng 10 là đang trong tháng sinh nhật.
+    private static Customer Member(MemberTier tier, int? birthdayMonth = 10) =>
+        new() { Id = "c1", Tier = tier, Birthday = birthdayMonth is int m ? new DateTime(1999, m, 15) : null };
+
+    [Theory]
+    [InlineData(MemberTier.Bronze, 18_000)]   // 20% của 3 × 30.000
+    [InlineData(MemberTier.Silver, 27_000)]   // 30%
+    [InlineData(MemberTier.Gold, 36_000)]     // 40%
+    [InlineData(MemberTier.Diamond, 45_000)]  // 50%
+    public void Birthday_month_takes_the_tier_percent_off_drinks(MemberTier tier, int expected)
+    {
+        var r = Price([(Item("tra", "tra-sua", 30_000), 3)], [], Member(tier), delivery: false);
+        Assert.Equal(expected, r.DiscountTotal);
+        var row = Assert.Single(r.Discounts);
+        Assert.Equal(DiscountKind.Birthday, row.Kind);
+        Assert.Equal(expected, row.Amount);
+    }
+
+    [Fact]
+    public void Birthday_discount_comes_after_the_drink_voucher_and_only_on_drinks()
+    {
+        var r = Price([(Item("tra", "tra-sua", 20_000), 3), (Item("banh", "mon-ngon", 39_000), 1)], [MemberDrink], Member(MemberTier.Gold));
+
+        Assert.Equal(99_000, r.Subtotal);          // 3 × 20.000 + 39.000
+        Assert.Equal(34_800, r.DiscountTotal);     // voucher 3 × 6.000 = 18.000; sinh nhật 40% × (60.000 − 18.000) = 16.800
+        Assert.Equal(15_000, r.ShippingFee);       // 64.200 < 100.000
+        Assert.Equal(79_200, r.Total);
+        Assert.Equal(64_200, r.EligibleSpend);     // chi tiêu hạng trừ cả giảm sinh nhật
+        Assert.Equal([DiscountKind.Member, DiscountKind.Birthday], r.Discounts.Select(d => d.Kind));
+    }
+
+    [Fact]
+    public void Birthday_discount_needs_three_cups_in_the_order()
+    {
+        var r = Price([(Item("tra", "tra-sua", 30_000), 2), (Item("banh", "mon-ngon", 39_000), 1)], [], Member(MemberTier.Diamond), delivery: false);
+        Assert.Equal(0, r.DiscountTotal);          // 2 ly, bánh không tính là ly
+    }
+
+    [Theory]
+    [InlineData(3)]     // sinh nhật tháng 3, đang tháng 10
+    [InlineData(null)]  // chưa khai ngày sinh
+    public void No_birthday_discount_outside_the_birthday_month(int? month)
+    {
+        var r = Price([(Item("tra", "tra-sua", 30_000), 3)], [], Member(MemberTier.Diamond, month), delivery: false);
+        Assert.Equal(0, r.DiscountTotal);
+    }
+
+    [Fact]
+    public void Code_minimum_is_checked_after_the_birthday_discount()
+    {
+        // 4 ly × 30.000 = 120.000, Kim cương giảm 50% còn 60.000: không đủ đơn tối thiểu 100.000.
+        var bot20 = Live(new Promotion { Id = "b20", Code = "BOT20K", Name = "Bớt 20K", Type = PromotionType.Fixed, Value = 20_000, MinOrderValue = 100_000 });
+        var r = Price([(Item("tra", "tra-sua", 30_000), 4)], [bot20], Member(MemberTier.Diamond), "BOT20K", delivery: false);
+        Assert.Null(r.AppliedCode);
+        Assert.Contains("Đơn tối thiểu", r.CodeError);
+        Assert.Equal(60_000, r.Total);
+    }
+
     // ---------------------------------------------------------------- hạng và sao
 
     [Theory]

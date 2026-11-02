@@ -91,3 +91,6 @@ Chú thích: ✅ xong · 🚧 đang làm · ⏳ chưa làm
   hết hạn sớm nhất trước); huỷ khi còn trên đường thì hàng về lại. `feat/stock-transfer`
 - ✅ G7. Trả hàng cho đơn đã hoàn thành trong 7 ngày: nhập lại kho hoặc xuất huỷ (hàng có hạn dùng chỉ xuất huỷ), hoàn tiền theo
   giá khách đã trả (chia giảm giá chung theo tỉ lệ, phí giao không hoàn), trừ lại sao và chi tiêu xét hạng. `feat/order-returns`
+- ✅ G8. Giảm giá tháng sinh nhật: thành viên mua trong tháng sinh nhật, đơn có từ 3 ly đồ uống thì giảm 20/30/40/50% tiền
+  đồ uống theo hạng (sau voucher ly, trước mã giảm giá), cả online lẫn tại quầy; chi tiêu xét hạng và sao tính sau giảm.
+  Lõi C++ lên 1.1.0. `feat/birthday-discount`

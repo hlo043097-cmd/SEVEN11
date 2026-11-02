@@ -22,7 +22,7 @@ public class NativePricingTests
         if (!NativeExpected) return; // Windows: dựng bằng CMake, không bắt buộc
         Assert.NotNull(PricingEngine.Native);
         Assert.StartsWith("C++", PricingEngine.Current.Name);
-        Assert.Equal("1.0.0", Native.Version);
+        Assert.Equal("1.1.0", Native.Version);
     }
 
     [Theory]
@@ -81,6 +81,8 @@ public class NativePricingTests
                 Delivery = random.Next(2),
                 ShippingFee = 15_000,
                 FreeShippingFrom = 100_000,
+                BirthdayPercent = random.NextDouble() < 0.3 ? new[] { 20, 30, 40, 50 }[random.Next(4)] : 0,
+                BirthdayMinCups = 3,
             };
 
             var managedLines = new CoreLineResult[count];
@@ -92,7 +94,7 @@ public class NativePricingTests
             Assert.Equal(managedLines, nativeLines);
             // Bất biến: tổng = tạm tính − giảm giá + phí giao, không âm.
             Assert.Equal(Math.Max(0, managed.Subtotal - managed.DiscountTotal) + managed.ShippingFee, managed.Total);
-            Assert.True(managed.EligibleSpend >= 0 && managed.CodeDiscount >= 0 && managed.MemberDiscount >= 0);
+            Assert.True(managed.EligibleSpend >= 0 && managed.CodeDiscount >= 0 && managed.MemberDiscount >= 0 && managed.BirthdayDiscount >= 0);
         }
     }
 
@@ -132,7 +134,9 @@ public class NativePricingTests
                 var cart = Enumerable.Range(0, random.Next(1, 7))
                     .Select(_ => new CartLine($"p{random.Next(1, 41)}", random.Next(1, 8)))
                     .GroupBy(l => l.ProductId).Select(g => new CartLine(g.Key, g.Sum(l => l.Quantity))).ToList();
-                var customer = random.NextDouble() < 0.6 ? new Customer { Id = "c", Tier = (MemberTier)random.Next(4) } : null;
+                var customer = random.NextDouble() < 0.6
+                    ? new Customer { Id = "c", Tier = (MemberTier)random.Next(4), Birthday = random.NextDouble() < 0.4 ? new DateTime(1999, 10, 1) : null }
+                    : null;
                 var code = codes[random.Next(codes.Length)];
                 var channel = random.Next(2) == 0 ? SalesChannel.Online : SalesChannel.InStore;
 

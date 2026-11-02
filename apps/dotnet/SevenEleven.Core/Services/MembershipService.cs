@@ -42,6 +42,12 @@ public static class MembershipService
 
     public const int MaxDrinkVouchersPerOrder = 3;
 
+    /// <summary>Đơn phải có từ chừng này ly đồ uống mới được giảm tháng sinh nhật.</summary>
+    public const int BirthdayMinCups = 3;
+
+    /// <summary>Khách có ngày sinh và đang trong tháng sinh nhật.</summary>
+    public static bool IsBirthdayMonth(Customer? customer, DateTime now) => customer?.Birthday?.Month == now.Month;
+
     public static TierInfo Info(MemberTier tier) => Tiers[tier];
 
     /// <summary>Hạng cao nhất mà chi tiêu tích luỹ đã chạm tới.</summary>

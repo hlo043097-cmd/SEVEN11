@@ -34,6 +34,10 @@ public struct CoreOptions
     public int Delivery;
     public int ShippingFee;
     public int FreeShippingFrom;
+    /// <summary>Giảm % đồ uống trong tháng sinh nhật; 0 là không áp.</summary>
+    public int BirthdayPercent;
+    /// <summary>Số ly tối thiểu trong đơn để được giảm sinh nhật.</summary>
+    public int BirthdayMinCups;
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -60,6 +64,7 @@ public struct CoreResult
     public int FreeShipping;
     public long Total;
     public long EligibleSpend;
+    public long BirthdayDiscount;
 }
 
 /// <summary>Phần tính tiền của bộ tính giá. Có hai bản cho cùng một phép tính: C++ và C#.</summary>
@@ -134,7 +139,23 @@ public sealed class ManagedPricingCore : IPricingCore
             }
         }
 
-        var baseAmount = afterLines - r.MemberDiscount;
+        if (options.BirthdayPercent > 0)
+        {
+            long cups = 0, drinkTotal = 0;
+            for (var i = 0; i < lines.Length; i++)
+                if (lines[i].IsDrink != 0)
+                {
+                    cups += lines[i].Quantity;
+                    drinkTotal += results[i].LineTotal;
+                }
+            if (cups >= options.BirthdayMinCups)
+            {
+                var drinkBase = Math.Max(0, drinkTotal - r.MemberDiscount);
+                r.BirthdayDiscount = RoundHalfUp(drinkBase * (double)options.BirthdayPercent / 100.0);
+            }
+        }
+
+        var baseAmount = afterLines - r.MemberDiscount - r.BirthdayDiscount;
         if (options.CodeType != CodeType.None)
         {
             for (var i = 0; i < lines.Length; i++)
@@ -155,7 +176,7 @@ public sealed class ManagedPricingCore : IPricingCore
             }
         }
 
-        r.DiscountTotal = r.LineDiscounts + r.MemberDiscount + r.CodeDiscount;
+        r.DiscountTotal = r.LineDiscounts + r.MemberDiscount + r.BirthdayDiscount + r.CodeDiscount;
         var payable = Math.Max(0, r.Subtotal - r.DiscountTotal);
         r.FreeShipping = options.Delivery != 0 && payable >= options.FreeShippingFrom ? 1 : 0;
         r.ShippingFee = options.Delivery != 0 && r.ItemCount > 0 && r.FreeShipping == 0 ? options.ShippingFee : 0;
@@ -164,7 +185,7 @@ public sealed class ManagedPricingCore : IPricingCore
         long eligible = 0;
         for (var i = 0; i < lines.Length; i++)
             if (lines[i].IsAlcohol == 0) eligible += results[i].LineTotal;
-        r.EligibleSpend = Math.Max(0, eligible - r.MemberDiscount - r.CodeDiscount);
+        r.EligibleSpend = Math.Max(0, eligible - r.MemberDiscount - r.BirthdayDiscount - r.CodeDiscount);
         return r;
     }
 }

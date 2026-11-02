@@ -22,7 +22,7 @@ public class PricedLine
     public string? PromoLabel { get; set; }
 }
 
-public enum DiscountKind { FlashSale, BuyXGetY, Member, Code }
+public enum DiscountKind { FlashSale, BuyXGetY, Member, Birthday, Code }
 
 public record AppliedDiscount(DiscountKind Kind, string PromotionId, string Label, int Amount);
 
@@ -46,7 +46,7 @@ public class PricingResult
 /// <summary>
 /// Bộ máy tính giá duy nhất, chuyển 1-1 từ lib/pricing.ts. Giỏ hàng, máy bán tại quầy và dữ liệu mẫu
 /// đều đi qua đây nên tổng tiền không bao giờ lệch nhau giữa các màn hình. Thứ tự áp dụng:
-/// flash sale → mua X tặng Y → voucher đồ uống theo hạng → mã giảm giá → phí giao.
+/// flash sale → mua X tặng Y → voucher đồ uống theo hạng → giảm tháng sinh nhật → mã giảm giá → phí giao.
 /// </summary>
 public static class PricingService
 {
@@ -143,6 +143,10 @@ public static class PricingService
         var memberPromo = customer is null ? null : promotions.FirstOrDefault(p =>
             p.Type == PromotionType.MemberVoucher && IsLive(p, now, channel) && Tiers(p).Contains(customer.Tier));
         var tier = customer is null ? null : MembershipService.Info(customer.Tier);
+        // Tháng sinh nhật: quyền lợi của hạng, không cần chương trình khuyến mãi riêng.
+        var birthdayPercent = tier is not null && MembershipService.IsBirthdayMonth(customer, now)
+            ? (int)Math.Round(tier.BirthdayDrinkDiscount * 100)
+            : 0;
 
         var lines = new CoreLine[items.Count];
         for (var i = 0; i < items.Count; i++)
@@ -166,18 +170,20 @@ public static class PricingService
             Delivery = delivery ? 1 : 0,
             ShippingFee = DeliveryService.ShippingFee,
             FreeShippingFrom = DeliveryService.FreeShippingFrom,
+            BirthdayPercent = birthdayPercent,
+            BirthdayMinCups = MembershipService.BirthdayMinCups,
         };
         var results = new CoreLineResult[items.Count];
         var priced = core.Compute(lines, options, results);
 
-        // 3. Mã giảm giá: kiểm điều kiện bằng số tiền sau giảm theo món và voucher hạng, rồi tính lại.
+        // 3. Mã giảm giá: kiểm điều kiện bằng số tiền sau giảm theo món, voucher hạng và giảm sinh nhật, rồi tính lại.
         Promotion? appliedCode = null;
         string? codeError = null;
         var typed = code?.Trim().ToUpperInvariant();
         if (!string.IsNullOrEmpty(typed))
         {
             var promo = promotions.FirstOrDefault(p => p.Code?.ToUpperInvariant() == typed);
-            var baseAmount = results.Sum(r => r.LineTotal) - priced.MemberDiscount;
+            var baseAmount = results.Sum(r => r.LineTotal) - priced.MemberDiscount - priced.BirthdayDiscount;
             codeError = CodeError(promo, customer, channel, now, baseAmount);
             if (codeError is null && promo is not null)
             {
@@ -228,6 +234,11 @@ public static class PricingService
         {
             discounts.Add(new(DiscountKind.Member, memberPromo.Id,
                 $"Ưu đãi thành viên {tier.Label} (-{Money.Format(tier.DrinkVoucher)}/ly)", (int)priced.MemberDiscount));
+        }
+        if (priced.BirthdayDiscount > 0)
+        {
+            discounts.Add(new(DiscountKind.Birthday, "birthday",
+                $"Tháng sinh nhật (-{birthdayPercent}% đồ uống)", (int)priced.BirthdayDiscount));
         }
         if (appliedCode is not null && priced.CodeDiscount > 0)
         {

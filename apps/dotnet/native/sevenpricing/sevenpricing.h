@@ -3,7 +3,7 @@
  *
  * C# (SevenEleven.Core/Services/PricingService.cs) quyết định khuyến mãi nào áp cho dòng nào
  * (ngày giờ, kênh bán, hạng thành viên, phạm vi sản phẩm, điều kiện mã). Lõi này làm phần tính
- * tiền: giá flash sale, mua X tặng Y, voucher đồ uống theo hạng, mã giảm giá, phí giao, chi tiêu
+ * tiền: giá flash sale, mua X tặng Y, voucher đồ uống theo hạng, giảm tháng sinh nhật, mã giảm giá, phí giao, chi tiêu
  * tính hạng; cộng thêm tích sao và khoảng cách giao hàng. Mọi số tiền là số nguyên VND, làm tròn
  * "nửa lên" giống Math.round của JavaScript để khớp bản Next.js từng đồng.
  *
@@ -48,6 +48,8 @@ typedef struct {
     int32_t delivery;           /* đơn giao tận nơi */
     int32_t shipping_fee;
     int32_t free_shipping_from;
+    int32_t birthday_percent;   /* giảm % đồ uống trong tháng sinh nhật; 0 = không áp */
+    int32_t birthday_min_cups;  /* số ly tối thiểu trong đơn để được giảm sinh nhật */
 } se_cart_options;
 
 typedef struct {
@@ -70,9 +72,10 @@ typedef struct {
     int32_t free_shipping;
     int64_t total;
     int64_t eligible_spend;      /* chi tiêu tính hạng và sao: sau mọi giảm giá, trừ đồ có cồn */
+    int64_t birthday_discount;
 } se_cart_result;
 
-/* Phiên bản thư viện, ví dụ "1.0.0". */
+/* Phiên bản thư viện, ví dụ "1.1.0". */
 SE_API const char* se_version(void);
 
 /* Giá flash sale một đơn vị: giảm theo phần trăm, làm tròn tới 1.000 ₫, giảm ít nhất 1.000 ₫. */

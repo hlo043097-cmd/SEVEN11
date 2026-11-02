@@ -59,11 +59,12 @@ apps/dotnet/
 **Lõi tính giá C++.** `SevenEleven.Core.csproj` tự biên dịch `native/sevenpricing` thành
 `libsevenpricing.dylib/.so` trước mỗi lần build và chép cạnh `.dll`. C# quyết định khuyến mãi nào áp
 cho dòng nào (giờ, kênh, hạng, phạm vi, điều kiện mã); phần cộng trừ tiền — flash sale → mua X tặng Y →
-voucher đồ uống theo hạng → mã giảm giá → phí giao — chạy trong C++. Máy không biên dịch được C++ thì
+voucher đồ uống theo hạng → giảm tháng sinh nhật → mã giảm giá → phí giao — chạy trong C++. Máy không biên dịch được C++ thì
 tự dùng bản C# (`SEVENELEVEN_PRICING=managed` để ép dùng C#). Chân trang khu quản lý ghi lõi đang chạy.
 
 **Nghiệp vụ đáng chú ý:** hạng Đồng/Bạc/Vàng/Kim cương lên ngay khi đủ mốc, ngày 1 hằng tháng xét giữ
-hạng (thiếu thì xuống 1 hạng, tháng vừa lên được miễn); 45.000 ₫ = 1 sao, sao hết hạn sau 12 tháng; giao
+hạng (thiếu thì xuống 1 hạng, tháng vừa lên được miễn); tháng sinh nhật giảm 20/30/40/50% đồ uống theo
+hạng khi đơn có từ 3 ly; 45.000 ₫ = 1 sao, sao hết hạn sau 12 tháng; giao
 trong 5 km; ca 06–14 / 14–22 / 22–06 với chốt tiền két; mọi biến động kho có nhật ký (bán, huỷ, nhập,
 điều chỉnh, kiểm kê, xuất huỷ); các thao tác ghi quan trọng khoá ghi từ trước khi đọc nên nhiều người
 bấm cùng lúc không bán quá tồn, không trả hàng/sao hai lần.

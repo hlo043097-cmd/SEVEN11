@@ -17,7 +17,7 @@ int64_t round_half_up(double value) { return static_cast<int64_t>(std::floor(val
 
 extern "C" {
 
-const char* se_version(void) { return "1.0.0"; }
+const char* se_version(void) { return "1.1.0"; }
 
 int32_t se_flash_price(int32_t price, int32_t percent) {
     const int64_t off = std::max<int64_t>(1000, round_half_up(price * static_cast<double>(percent) / 100.0 / 1000.0) * 1000);
@@ -68,8 +68,23 @@ int32_t se_price_cart(const se_line* lines, int32_t count, const se_cart_options
         }
     }
 
-    // 3. Mã giảm giá: chỉ tính trên các dòng thuộc phạm vi mã, không giảm quá số còn phải trả.
-    const int64_t base_amount = after_lines - r.member_discount;
+    // 3. Tháng sinh nhật: giảm % trên tiền đồ uống còn lại sau voucher hạng, khi đơn đủ số ly.
+    if (options->birthday_percent > 0) {
+        int64_t cups = 0;
+        int64_t drink_total = 0;
+        for (int32_t i = 0; i < count; ++i)
+            if (lines[i].is_drink) {
+                cups += lines[i].quantity;
+                drink_total += line_results[i].line_total;
+            }
+        if (cups >= options->birthday_min_cups) {
+            const int64_t drink_base = std::max<int64_t>(0, drink_total - r.member_discount);
+            r.birthday_discount = round_half_up(drink_base * static_cast<double>(options->birthday_percent) / 100.0);
+        }
+    }
+
+    // 4. Mã giảm giá: chỉ tính trên các dòng thuộc phạm vi mã, không giảm quá số còn phải trả.
+    const int64_t base_amount = after_lines - r.member_discount - r.birthday_discount;
     if (options->code_type != SE_CODE_NONE) {
         for (int32_t i = 0; i < count; ++i)
             if (lines[i].code_eligible) r.code_eligible_total += line_results[i].line_total;
@@ -85,18 +100,18 @@ int32_t se_price_cart(const se_line* lines, int32_t count, const se_cart_options
         }
     }
 
-    // 4. Phí giao: miễn khi số phải trả (chưa kể phí) đạt ngưỡng.
-    r.discount_total = r.line_discounts + r.member_discount + r.code_discount;
+    // 5. Phí giao: miễn khi số phải trả (chưa kể phí) đạt ngưỡng.
+    r.discount_total = r.line_discounts + r.member_discount + r.birthday_discount + r.code_discount;
     const int64_t payable = std::max<int64_t>(0, r.subtotal - r.discount_total);
     r.free_shipping = options->delivery && payable >= options->free_shipping_from ? 1 : 0;
     r.shipping_fee = options->delivery && r.item_count > 0 && !r.free_shipping ? options->shipping_fee : 0;
     r.total = payable + r.shipping_fee;
 
-    // 5. Chi tiêu tính hạng: tiền hàng không có cồn, trừ voucher hạng và mã.
+    // 6. Chi tiêu tính hạng: tiền hàng không có cồn, trừ voucher hạng, giảm sinh nhật và mã.
     int64_t eligible = 0;
     for (int32_t i = 0; i < count; ++i)
         if (!lines[i].is_alcohol) eligible += line_results[i].line_total;
-    r.eligible_spend = std::max<int64_t>(0, eligible - r.member_discount - r.code_discount);
+    r.eligible_spend = std::max<int64_t>(0, eligible - r.member_discount - r.birthday_discount - r.code_discount);
 
     *result = r;
     return 0;
